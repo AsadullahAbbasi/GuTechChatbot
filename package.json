@@ -7,10 +7,10 @@
     "start": "node index.js"
   },
   "dependencies": {
-    "@qdrant/js-client-rest": "^1.7.0",
-    "node-fetch": "^3.3.2",
+    "@google/generative-ai": "^0.15.0",
+    "@qdrant/js-client-rest": "^1.8.0",
     "cors": "^2.8.5",
-    "dotenv": "^16.3.1",
+    "dotenv": "^16.4.5",
     "express": "^4.19.2"
   }
 }
