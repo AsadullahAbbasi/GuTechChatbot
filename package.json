@@ -2,14 +2,14 @@
   "name": "gemini-qdrant-chatbot-backend",
   "version": "1.0.0",
   "type": "module",
-  "main": "a.js",
+  "main": "index.js",
   "scripts": {
-    "start": "node a.js"
+    "start": "node index.js"
   },
   "dependencies": {
     "@qdrant/js-client-rest": "^1.7.0",
     "node-fetch": "^3.3.2",
-    "dotenv": "^16.3.1"
+    "dotenv": "^16.3.1",
+    "express": "^4.19.2"
   }
 }
-  

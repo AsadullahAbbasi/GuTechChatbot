@@ -1,2 +1,2 @@
 .env
-node_modules/.bin/mime
+node_modules/
