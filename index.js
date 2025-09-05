@@ -2,42 +2,46 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import { QdrantClient } from "@qdrant/js-client-rest";
-import OpenAI from "openai";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-dotenv.config();
+dotenv.config(); // Load environment variables from .env file
 
 const app = express();
-app.use(cors());
-app.use(express.json());
+app.use(cors()); // Enable CORS for all origins (for development)
+app.use(express.json()); // Enable JSON body parsing
 
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3001; // Use port from .env or default to 3001
 
-// Qdrant Client
+// Qdrant Client Setup
 const qdrantClient = new QdrantClient({
   url: process.env.QDRANT_URL,
   apiKey: process.env.QDRANT_API_KEY,
 });
 
-// OpenAI Client
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
-// Gemini Client (for embeddings only)
+// Google Gemini Generative AI Client Setup
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const generativeModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+// Google Gemini Embedding Model Setup
 const embeddingModel = genAI.getGenerativeModel({ model: "embedding-001" });
 
-// Collection
+// Qdrant Collection Name (must match what you used for embedding)
 const QDRANT_COLLECTION_NAME = "gutech_knowledge_base";
 
 /**
- * Get embedding from Gemini (768-dim, matches your Qdrant collection)
+ * Generates an embedding for a given text using the Gemini Embedding API.
+ * @param {string} text The text to embed.
+ * @returns {Promise<number[]>} A promise that resolves to the embedding vector.
+ * @throws {Error} If embedding generation fails.
  */
 async function getEmbedding(text) {
   try {
     const embeddingRes = await embeddingModel.embedContent(text);
-    if (!embeddingRes?.embedding?.values) {
+    if (
+      !embeddingRes ||
+      !embeddingRes.embedding ||
+      !embeddingRes.embedding.values
+    ) {
       throw new Error("Invalid embedding response from Gemini API.");
     }
     return embeddingRes.embedding.values;
@@ -47,7 +51,7 @@ async function getEmbedding(text) {
   }
 }
 
-// API Endpoint
+// API Endpoint for Chat Queries
 app.post("/query", async (req, res) => {
   const { userQuery } = req.body;
   if (!userQuery) {
@@ -55,17 +59,17 @@ app.post("/query", async (req, res) => {
   }
 
   try {
-    // 1. Embed query using Gemini
+    // 1. Generate embedding for the user's query
     const queryEmbedding = await getEmbedding(userQuery);
 
-    // 2. Search Qdrant
+    // 2. Search Qdrant for relevant context
     const searchResult = await qdrantClient.search(QDRANT_COLLECTION_NAME, {
       vector: queryEmbedding,
-      limit: 10,
-      with_payload: true,
+      limit: 10, // Increased limit for debugging purposes
+      with_payload: true, // Ensure the original content and metadata are returned
     });
 
-    // 3. Build context
+    // Extract content and relevant metadata from relevant chunks to form context
     const context = searchResult
       .map((item) => {
         let chunkContent = item.payload?.content || "";
@@ -73,29 +77,42 @@ app.post("/query", async (req, res) => {
         const chunkTitle = item.payload?.title;
         const chunkSourceFile = item.payload?.source_file;
 
-        if (chunkTitle) chunkContent += `\nTitle: ${chunkTitle}`;
-        if (chunkUrl) chunkContent += `\nSource URL: ${chunkUrl}`;
-        if (chunkSourceFile) chunkContent += `\nSource File: ${chunkSourceFile}`;
+        // Append URL and other useful metadata to the content
+        if (chunkTitle) {
+          chunkContent += `\nTitle: ${chunkTitle}`;
+        }
+        if (chunkUrl) {
+          chunkContent += `\nSource URL: ${chunkUrl}`;
+        }
+        if (chunkSourceFile) {
+          chunkContent += `\nSource File: ${chunkSourceFile}`;
+        }
         return chunkContent;
       })
-      .filter(Boolean)
-      .join("\n\n---\n\n");
+      .filter(Boolean) // Remove empty strings
+      .join("\n\n---\n\n"); // Join with a clear separator
 
-    // 4. Build prompt
     let chatInput;
     if (context.trim() === "") {
       chatInput = `
-You are a professional, knowledgeable university assistant.
-You need to respond for GUTech/Al Ghazali University School of Technology in Karachi.
-No specific data is available from the knowledge base, but you must still respond confidently and helpfully.
-
+      
+      You are a professional, knowledgeable university assistant .
+      you need to respond for GUTech/Al Ghazali University School of Technology under the context of universities and HEIs established in Karachi Pakistan. 
+The user has asked a question, but no specific data is available.
+Your task: respond confidently and helpfully without saying you lack information.
+Provide logical, informed answers based on general university knowledge, best practices, or helpful next steps.
+Example responses:
+- "For up-to-date details on admissions, please visit our official website or contact the admissions office."
+- "You can find information about campus facilities on our website’s About section or reach out to our support team."
 User Query: ${userQuery}`;
     } else {
       chatInput = `You are a helpful and expert assistant for GU TECH (Greenwich University Technology Campus).
 Use only the following relevant data to answer the user’s question.
-If multiple entities are possible, list them concisely.
-Do not say information is missing.
+If the user's query could refer to multiple entities or pieces of information within the provided data, list all relevant options and their key details concisely, rather than asking for clarification.
+Do not state that information is missing or ask the user to refine their query.
+Instead, infer answers based on related info, common university practices, or suggest practical next steps the user can take.
 Keep answers concise, professional, and user-friendly.
+Add emojis only when they add clarity or friendliness.
 
 Relevant Data:
 ${context}
@@ -103,18 +120,12 @@ ${context}
 User Query: ${userQuery}`;
     }
 
-    // 5. Generate response using ChatGPT
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        { role: "system", content: "You are a helpful and expert university assistant." },
-        { role: "user", content: chatInput },
-      ],
-    });
+    // 4. Generate response using Gemini-1.5-Flash
+    const result = await generativeModel.generateContent(chatInput);
+    const response = await result.response;
+    const answer = response.text();
 
-    const answer = completion.choices[0].message.content;
-
-    res.json({ answer });
+    res.json({ answer }); // Send the generated answer back to the frontend
   } catch (err) {
     console.error("Error in /query endpoint:", err);
     res.status(500).json({
@@ -124,6 +135,7 @@ User Query: ${userQuery}`;
   }
 });
 
+// Start the server
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
