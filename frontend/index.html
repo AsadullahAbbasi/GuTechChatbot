@@ -1,0 +1,1155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GU TECH AI Assistant</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            height: 100vh;
+        }
+
+        .chat-button {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            width: 70px;
+            height: 70px;
+            background: linear-gradient(135deg, #B91C1C, #DC2626);
+            border: none;
+            border-radius: 50%;
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            box-shadow: 0 8px 32px rgba(185, 28, 28, 0.4);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 1000;
+            transform: scale(1);
+            opacity: 1;
+        }
+
+        .chat-button:hover {
+            transform: scale(1.1);
+            box-shadow: 0 12px 40px rgba(185, 28, 28, 0.6);
+        }
+
+        .chat-button.hidden {
+            transform: scale(0);
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .chat-container {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 420px;
+            max-height: 650px;
+            height: 90vh;
+            width: 90vw;
+            max-width: 420px;
+            overflow: hidden;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            display: none;
+            flex-direction: column;
+            overflow: hidden;
+            z-index: 999;
+            transform: scale(0.8) translateY(20px);
+            opacity: 0;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            transform-origin: bottom right;
+        }
+
+        .chat-container.show {
+            transform: scale(1) translateY(0);
+            opacity: 1;
+        }
+
+        .chat-container.hide {
+            transform: scale(0.8) translateY(20px);
+            opacity: 0;
+        }
+
+        .chat-header {
+            background: linear-gradient(135deg, #B91C1C, #DC2626);
+            color: white;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .header-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .header-avatar {
+            width: 45px;
+            height: 45px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+
+        .header-text h3 {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .header-text p {
+            font-size: 13px;
+            opacity: 0.9;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 50%;
+            transition: all 0.2s;
+        }
+
+        .close-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: rotate(90deg);
+        }
+
+        .chat-messages {
+            flex: 1;
+            padding-inline: 25px;
+            padding-block: 20px;
+            overflow-y: auto;
+            background: #f8fafc;
+            scroll-behavior: smooth;
+        }
+
+        .chat-messages::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .chat-messages::-webkit-scrollbar-thumb {
+            background: #B91C1C;
+            border-radius: 4px;
+        }
+
+        .message {
+            margin-bottom: 20px;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+        }
+
+        .message.user {
+            flex-direction: row-reverse;
+        }
+
+        .message-avatar {
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+
+        .message.user .message-avatar {
+            background: linear-gradient(135deg, #3B82F6, #1D4ED8);
+            color: white;
+        }
+
+        .message.bot .message-avatar {
+            background: linear-gradient(135deg, #B91C1C, #DC2626);
+            color: white;
+        }
+
+        .message-content {
+            max-width: 300px;
+            padding: 15px 18px;
+            border-radius: 18px;
+            font-size: 14px;
+            resize: none;
+            line-height: 1.6;
+            word-wrap: break-word;
+        }
+
+        .message.user .message-content {
+            background: linear-gradient(135deg, #3B82F6, #1D4ED8);
+            color: white;
+            border-bottom-right-radius: 6px;
+        }
+
+        .message.bot .message-content {
+            background: white;
+            color: #1f2937;
+            border: 1px solid #e5e7eb;
+            border-bottom-left-radius: 6px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Improved link styling */
+        .message-content a {
+            color: #B91C1C !important;
+            text-decoration: underline !important;
+            font-weight: 500 !important;
+            display: inline !important;
+        }
+
+        .message-content a:hover {
+            color: #DC2626 !important;
+            text-decoration: underline !important;
+        }
+
+        .message-content strong {
+            font-weight: 600;
+            color: #1f2937;
+        }
+
+        /* Improved list styling with proper bullet points */
+        .message-content ul {
+            margin: 12px 0;
+            padding-left: 0;
+            list-style: none;
+        }
+
+        .message-content ul li {
+            position: relative;
+            padding-left: 20px;
+            margin-bottom: 8px;
+            line-height: 1.5;
+        }
+
+        .message-content ul li::before {
+            content: "•";
+            color: #B91C1C;
+            font-weight: bold;
+            position: absolute;
+            left: 0;
+            top: 0;
+        }
+
+        /* Better paragraph spacing */
+        .message-content p {
+            margin-bottom: 12px;
+        }
+
+        .message-content p:last-child {
+            margin-bottom: 0;
+        }
+
+        /* Improved section spacing */
+        .message-content br + br {
+            display: block;
+            margin: 8px 0;
+            content: "";
+        }
+
+        .typing-indicator {
+            display: flex;
+            gap: 4px;
+            padding: 15px 18px;
+        }
+
+        .typing-dot {
+            width: 8px;
+            height: 8px;
+            background: #9ca3af;
+            border-radius: 50%;
+            animation: typing 1.4s infinite ease-in-out;
+        }
+
+        .typing-dot:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .typing-dot:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes typing {
+            0%, 60%, 100% {
+                transform: translateY(0);
+                opacity: 0.4;
+            }
+            30% {
+                transform: translateY(-10px);
+                opacity: 1;
+            }
+        }
+
+        .chat-input-area {
+            scrollbar-width: none;
+            padding: 25px;
+            background: white;
+            border-top: 1px solid #e5e7eb;
+        }
+
+        .input-container {
+            display: flex;
+            gap: 12px;
+            align-items: flex-end;
+        }
+
+        .input-wrapper {
+            flex: 1;
+            position: relative;
+        }
+
+        .chat-input {
+            scrollbar-width: none;
+            width: 100%;
+            min-height: 50px;
+            max-height: 120px;
+            padding: 15px 20px;
+            border: 2px solid #e5e7eb;
+            border-radius: 25px;
+            font-size: 15px;
+            font-family: inherit;
+            resize: none;
+            outline: none;
+            transition: border-color 0.2s;
+            background: #f8fafc;
+        }
+
+        .chat-input:focus {
+            border-color: #B91C1C;
+            background: white;
+        }
+
+        .chat-input:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            background: #f1f5f9;
+        }
+
+        .send-button {
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, #B91C1C, #DC2626);
+            border: none;
+            border-radius: 50%;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .send-button:hover:not(:disabled) {
+            transform: scale(1.05);
+            box-shadow: 0 4px 12px rgba(185, 28, 28, 0.3);
+        }
+
+        .send-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .quick-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 15px;
+        }
+
+        .quick-action {
+            background: #f1f5f9;
+            border: 1px solid #e2e8f0;
+            border-radius: 20px;
+            padding: 8px 14px;
+            font-size: 13px;
+            color: #64748b;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .quick-action:hover:not(:disabled) {
+            background: #B91C1C;
+            color: white;
+            border-color: #B91C1C;
+        }
+
+        .quick-action:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .welcome-message {
+            background: linear-gradient(135deg, rgba(185, 28, 28, 0.05), rgba(220, 38, 38, 0.05));
+            border: 1px solid rgba(185, 28, 28, 0.1);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .welcome-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .welcome-icon {
+            width: 30px;
+            height: 30px;
+            background: linear-gradient(135deg, #B91C1C, #DC2626);
+            color: white;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+        }
+
+        .welcome-title h4 {
+            font-size: 16px;
+            font-weight: 600;
+            color: #1f2937;
+        }
+
+        .welcome-text {
+            color: #4b5563;
+            font-size: 14px;
+            line-height: 1.5;
+            margin-bottom: 15px;
+        }
+
+        .feature-list {
+            list-style: none;
+            color: #6b7280;
+            font-size: 13px;
+        }
+
+        .feature-list li {
+            padding: 3px 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .feature-list li::before {
+            content: "•";
+            color: #B91C1C;
+            font-weight: bold;
+        }
+
+        .error-message {
+            color: #dc2626;
+            padding: 15px;
+            background: #fef2f2;
+            border-radius: 8px;
+            border: 1px solid #fecaca;
+            margin: 10px 0;
+        }
+
+        .error-message strong {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        @media (max-width: 480px) {
+            .chat-container {
+                width: calc(100vw - 20px);
+                height: calc(100vh - 40px);
+                bottom: 10px;
+                right: 10px;
+            }
+
+            .chat-button {
+                bottom: 20px;
+                right: 20px;
+            }
+
+            .message-content {
+                max-width: 250px;
+            }
+        }
+
+        .streaming-text {
+            display: inline;
+        }
+
+        .cursor {
+            display: inline-block;
+            background: #B91C1C;
+            width: 2px;
+            height: 1em;
+            animation: blink 1s infinite;
+            margin-left: 1px;
+        }
+
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
+        }
+
+        /* Backdrop blur effect */
+        .chat-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(2px);
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+            z-index: 998;
+        }
+
+        .chat-backdrop.show {
+            opacity: 1;
+            visibility: visible;
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-backdrop" id="chatBackdrop"></div>
+    
+    <button class="chat-button" id="chatToggle">
+        <i class="fas fa-comments"></i>
+    </button>
+
+    <div class="chat-container" id="chatContainer">
+        <div class="chat-header">
+            <div class="header-info">
+                <div class="header-avatar">
+                    <i class="fas fa-graduation-cap"></i>
+                </div>
+                <div class="header-text">
+                    <h3>GU TECH Assistant</h3>
+                    <p id="statusText">Online • Ready to help</p>
+                </div>
+            </div>
+            <button class="close-btn" id="closeChat">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+        <div class="chat-messages" id="chatMessages"></div>
+
+        <div class="chat-input-area">
+            <div class="input-container">
+                <div class="input-wrapper">
+                    <textarea class="chat-input" id="messageInput" placeholder="Ask me anything about GU TECH..." rows="1"></textarea>
+                </div>
+                <button class="send-button" id="sendButton">
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+            </div>
+            <div class="quick-actions">
+                <button class="quick-action" data-query="cs" data-display="CS Programs">
+                    <i class="fas fa-laptop-code"></i> CS
+                </button>
+                <button class="quick-action" data-query="programs" data-display="All Programs">
+                    <i class="fas fa-book"></i> Programs
+                </button>
+                <button class="quick-action" data-query="admission" data-display="Admission Process">
+                    <i class="fas fa-clipboard-list"></i> Admissions
+                </button>
+                <button class="quick-action" data-query="fee" data-display="Fee Structure">
+                    <i class="fas fa-dollar-sign"></i> Fees
+                </button>
+                <button class="quick-action" data-query="faculty" data-display="Faculty Information">
+                    <i class="fas fa-chalkboard-teacher"></i> Faculty
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const BACKEND_URL = 'https://gutechchatbot.onrender.com';
+        const TYPING_SPEED = 50;
+        const RESPONSE_DELAY = 800;
+
+        // DOM Elements
+        const chatToggle = document.getElementById('chatToggle');
+        const chatContainer = document.getElementById('chatContainer');
+        const chatBackdrop = document.getElementById('chatBackdrop');
+        const closeChatBtn = document.getElementById('closeChat');
+        const chatMessages = document.getElementById('chatMessages');
+        const messageInput = document.getElementById('messageInput');
+        const sendButton = document.getElementById('sendButton');
+        const statusText = document.getElementById('statusText');
+
+        // State Management
+        let isProcessing = false;
+        let currentTypingIndicator = null;
+        let isChatOpen = false;
+        let isTyping = false;
+        let isAutoScrolling = false;
+        let userScrolledUp = false;
+
+        // Fixed Chatbot Data with improved formatting
+        const chatbotData = {
+            cs: {
+                title: "CS Programs",
+                text: `<p><strong>BS Computer Science (BSCS) Program</strong></p>
+                       <p>The BSCS program at GU TECH prepares students for industry with a focus on IT product innovation, research, and entrepreneurship.</p>
+                       
+                       <p><strong>Key Features:</strong></p>
+                       <ul>
+                           <li>Artificial Intelligence and Machine Learning</li>
+                           <li>Software Engineering and Development</li>
+                           <li>Data Structures and Algorithms</li>
+                           <li>Innovation and Incubation Center (IIC) exposure</li>
+                       </ul>
+                       
+                       <p><strong>Total Credit Hours:</strong> 132</p>
+                       <p><a href='https://www.gutech.edu.pk/programs/' target='_blank' rel='noopener noreferrer'>Learn more about our CS program</a></p>`,
+                keywords: ['cs', 'computer science', 'bscs', 'artificial intelligence', 'software engineering', 'data structures', 'programming', 'coding', 'it', 'technology']
+            },
+            programs: {
+                title: "All Programs",
+                text: `<p><strong>GU TECH Academic Programs</strong></p>
+                       
+                       <p><strong>1. Bachelor of Business Administration (BBA)</strong></p>
+                       <ul>
+                           <li>Market-driven curriculum</li>
+                           <li>Aligned with global industry trends</li>
+                           <li>Focus on practical business skills</li>
+                       </ul>
+                       <p><a href='https://www.gutech.edu.pk/programs/' target='_blank' rel='noopener noreferrer'>Learn more about BBA</a></p>
+                       
+                       <p><strong>2. BS Computer Science (BSCS)</strong></p>
+                       <ul>
+                           <li>IT product innovation focus</li>
+                           <li>Research and development emphasis</li>
+                           <li>Industry-relevant curriculum</li>
+                       </ul>
+                       <p><a href='https://www.gutech.edu.pk/programs/' target='_blank' rel='noopener noreferrer'>Learn more about BSCS</a></p>
+                       
+                       <p><strong>3. MS Islamic Banking & Finance (MS IBF)</strong></p>
+                       <ul>
+                           <li>Integration of Islamic teachings</li>
+                           <li>Modern financial practices</li>
+                           <li>Shariah-compliant finance expertise</li>
+                       </ul>
+                       <p><a href='https://www.gutech.edu.pk/programs/' target='_blank' rel='noopener noreferrer'>Learn more about MS IBF</a></p>`,
+                keywords: ['programs', 'courses', 'degrees', 'bba', 'ms ibf', 'islamic banking', 'finance', 'business administration', 'bachelor', 'master']
+            },
+            admission: {
+                title: "Admission Process",
+                text: `<p><strong>Step-by-Step Admission Guide</strong></p>
+                       
+                       <p><strong>Step 1: Explore Programs</strong></p>
+                       <p>Visit our <a href='https://gutech.edu.pk/programs/' target='_blank' rel='noopener noreferrer'>Programs page</a> to choose the best fit for your career goals.</p>
+                       
+                       <p><strong>Step 2: Check Eligibility</strong></p>
+                       <p>Review admission criteria for your chosen program. <a href='https://www.gutech.edu.pk/programs/' target='_blank' rel='noopener noreferrer'>View eligibility details</a></p>
+                       
+                       <p><strong>Step 3: Apply Online</strong></p>
+                       <p>Complete the application form at <a href='https://gutech.edu.pk/apply-now/' target='_blank' rel='noopener noreferrer'>Apply Now</a></p>
+                       
+                       <p><strong>Step 4: Submit Documents</strong></p>
+                       <ul>
+                           <li>Academic transcripts</li>
+                           <li>CNIC or B-Form copy</li>
+                           <li>Passport-size photographs</li>
+                           <li>Other program-specific documents</li>
+                       </ul>
+                       
+                       <p><strong>Step 5: Pay Application Fee</strong></p>
+                       <p>Complete payment online or via bank transfer. <a href='https://www.gutech.edu.pk/fee-structure/' target='_blank' rel='noopener noreferrer'>View fee details</a></p>
+                       
+                       <p><strong>Step 6: Track Application</strong></p>
+                       <p>Use your portal login to monitor application status and receive updates.</p>`,
+                keywords: ['admission', 'apply', 'application', 'eligibility', 'requirements', 'documents', 'fee payment', 'enroll', 'registration']
+            },
+            fee: {
+                title: "Fee Structure",
+                text: `<p><strong>GU TECH Fee Structure (2025)</strong></p>
+                       
+                       <p><strong>Program Fees (per credit hour):</strong></p>
+                       <ul>
+                           <li><strong>BBA:</strong> PKR 7,000 (50% waived for 2025 admissions)</li>
+                           <li><strong>BSCS:</strong> PKR 8,000 (50% waived for 2025 admissions)</li>
+                           <li><strong>MS IBF:</strong> PKR 7,000 (50% waived for 2025 admissions)</li>
+                       </ul>
+                       
+                       <p><strong>Additional Fees:</strong></p>
+                       <ul>
+                           <li>Registration Fee: PKR 1,000</li>
+                           <li>Admission Fee: PKR 10,000</li>
+                           <li>Exam Fee: PKR 5,000 per semester</li>
+                       </ul>
+                       
+                       <p><strong>Special Offer:</strong> 50% fee waiver available for 2025 admissions!</p>
+                       <p><a href='https://www.gutech.edu.pk/fee-structure-2' target='_blank' rel='noopener noreferrer'>View complete fee structure</a></p>`,
+                keywords: ['fee', 'fees', 'tuition', 'cost', 'price', 'payment', 'scholarship', 'installment', 'money', 'charges']
+            },
+            faculty: {
+                title: "Faculty Information",
+                text: `<p><strong>Distinguished Faculty at GU TECH</strong></p>
+                       
+                       <p>Our faculty comprises experts from leading global institutions, providing students with unparalleled expertise for academic excellence and real-world success.</p>
+                       
+                       <p><strong>Department Expertise:</strong></p>
+                       <ul>
+                           <li><strong>BSCS Faculty:</strong> Specialists in AI, Machine Learning, and cutting-edge technologies</li>
+                           <li><strong>BBA Faculty:</strong> Business leaders with extensive real-world experience</li>
+                           <li><strong>MS IBF Faculty:</strong> Renowned Shariah scholars and finance experts</li>
+                       </ul>
+                       
+                       <p><strong>Faculty Qualifications:</strong></p>
+                       <ul>
+                           <li>PhD holders from prestigious universities</li>
+                           <li>Industry professionals with practical experience</li>
+                           <li>Research-active academics</li>
+                           <li>International exposure and expertise</li>
+                       </ul>
+                       
+                       <p><a href='https://www.gutech.edu.pk/our-faculty' target='_blank' rel='noopener noreferrer'>Meet our faculty members</a></p>`,
+                keywords: ['faculty', 'professors', 'teachers', 'staff', 'instructors', 'departments', 'academic', 'experts']
+            },
+            test: {
+                title: "Admission Test",
+                text: `<p><strong>GU TECH Standard Admission Test (GSAT)</strong></p>
+                       
+                       <p>The GSAT evaluates academic capabilities and skills relevant to your chosen program.</p>
+                       
+                       <p><strong>Sample Test Papers:</strong></p>
+                       <ul>
+                           <li><strong>BSCS Sample Test:</strong> <a href='https://alghazali.edu.pk/_files/ugd/e572c6_7c19508691c64ccf9ef39883cfe8c00b.pdf' target='_blank' rel='noopener noreferrer'>Download PDF</a></li>
+                           <li><strong>BBA/BS Accounting & Finance:</strong> <a href='https://alghazali.edu.pk/_files/ugd/e572c6_d99ff431d3c2474f80a03fe7c6c9675e.pdf' target='_blank' rel='noopener noreferrer'>Download PDF</a></li>
+                           <li><strong>MS IBF Sample Test:</strong> <a href='https://alghazali.edu.pk/_files/ugd/e572c6_99037a59e2e348bfb418a878fb1e09b6.pdf' target='_blank' rel='noopener noreferrer'>Download PDF</a></li>
+                       </ul>
+                       
+                       <p><strong>Test Format:</strong></p>
+                       <ul>
+                           <li>Multiple choice questions</li>
+                           <li>Program-specific content</li>
+                           <li>Time-bound assessment</li>
+                           <li>Merit-based evaluation</li>
+                       </ul>
+                       
+                       <p><a href='https://alghazali.edu.pk/gsat' target='_blank' rel='noopener noreferrer'>Learn more about GSAT</a></p>`,
+                keywords: ['test', 'exam', 'gsat', 'sample test', 'admission test', 'question paper', 'assessment', 'evaluation']
+            }
+        };
+
+        // Utility Functions
+        function sanitizeHTML(str) {
+            const temp = document.createElement('div');
+            temp.textContent = str;
+            return temp.innerHTML;
+        }
+
+        function scrollToBottom(force = false) {
+            if (force || (!userScrolledUp && !isAutoScrolling)) {
+                isAutoScrolling = true;
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+                setTimeout(() => {
+                    isAutoScrolling = false;
+                }, 100);
+            }
+        }
+
+        chatMessages.addEventListener('scroll', () => {
+            if (!isAutoScrolling) {
+                const isAtBottom = chatMessages.scrollTop + chatMessages.clientHeight >= chatMessages.scrollHeight - 10;
+                userScrolledUp = !isAtBottom;
+            }
+        });
+
+        function matchLocalTopic(userQuery) {
+            const query = userQuery.toLowerCase().trim();
+            const programKeywords = ['cs', 'computer science', 'bscs', 'bba', 'ms ibf', 'islamic banking', 'finance', 'business administration'];
+            const feeKeywords = ['fee', 'fees', 'tuition', 'cost', 'price', 'payment', 'scholarship', 'installment', 'money', 'charges'];
+
+            let programKeywordMatched = false;
+            let feeKeywordMatched = false;
+
+            for (const keyword of programKeywords) {
+                const regex = new RegExp(`\\b${keyword}\\b`, 'i');
+                if (regex.test(query)) {
+                    programKeywordMatched = true;
+                    break;
+                }
+            }
+
+            for (const keyword of feeKeywords) {
+                const regex = new RegExp(`\\b${keyword}\\b`, 'i');
+                if (regex.test(query)) {
+                    feeKeywordMatched = true;
+                    break;
+                }
+            }
+
+            if (feeKeywordMatched && programKeywordMatched) {
+                return 'fee';
+            }
+
+            let bestMatchKey = null;
+            let maxMatchedKeywords = 0;
+            let maxKeywordLength = 0;
+
+            for (const [key, data] of Object.entries(chatbotData)) {
+                let currentMatchedKeywords = 0;
+                let currentMaxKeywordLength = 0;
+
+                for (const keyword of data.keywords) {
+                    const regex = new RegExp(`\\b${keyword}\\b`, 'i');
+                    if (regex.test(query)) {
+                        currentMatchedKeywords++;
+                        if (keyword.length > currentMaxKeywordLength) {
+                            currentMaxKeywordLength = keyword.length;
+                        }
+                    }
+                }
+
+                if (currentMatchedKeywords > maxMatchedKeywords) {
+                    maxMatchedKeywords = currentMatchedKeywords;
+                    maxKeywordLength = currentMaxKeywordLength;
+                    bestMatchKey = key;
+                } else if (currentMatchedKeywords === maxMatchedKeywords && currentMaxKeywordLength > maxKeywordLength) {
+                    maxKeywordLength = currentMaxKeywordLength;
+                    bestMatchKey = key;
+                }
+            }
+
+            if (maxMatchedKeywords > 0) {
+                return bestMatchKey;
+            }
+            return null;
+        }
+
+        function setProcessingState(processing) {
+            isProcessing = processing;
+            messageInput.disabled = processing;
+            sendButton.disabled = processing;
+            document.querySelectorAll('.quick-action').forEach(button => {
+                button.disabled = processing;
+            });
+
+            if (processing) {
+                sendButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                statusText.textContent = 'Thinking...';
+            } else {
+                sendButton.innerHTML = '<i class="fas fa-paper-plane"></i>';
+                statusText.textContent = 'Online • Ready to help';
+            }
+        }
+
+        // Message Functions
+        function addUserMessage(text) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message user';
+            messageDiv.innerHTML = `
+                <div class="message-avatar">
+                    <i class="fas fa-user"></i>
+                </div>
+                <div class="message-content">${sanitizeHTML(text)}</div>
+            `;
+            chatMessages.appendChild(messageDiv);
+            scrollToBottom(true);
+        }
+
+        function addBotMessage(text, streaming = true) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message bot';
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+
+            messageDiv.innerHTML = `
+                <div class="message-avatar">
+                    <i class="fas fa-robot"></i>
+                </div>
+            `;
+            messageDiv.appendChild(contentDiv);
+            chatMessages.appendChild(messageDiv);
+
+            if (streaming) {
+                typeWriter(contentDiv, text);
+            } else {
+                contentDiv.innerHTML = text;
+                scrollToBottom(true);
+            }
+
+            return messageDiv;
+        }
+
+        function typeWriter(element, htmlText) {
+            element.innerHTML = '';
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = htmlText;
+
+            const nodesToType = [];
+
+            function collectNodes(node) {
+                if (node.nodeType === Node.TEXT_NODE) {
+                    const text = node.textContent;
+                    for (let i = 0; i < text.length; i++) {
+                        nodesToType.push({ type: 'text', content: text[i] });
+                    }
+                } else if (node.nodeType === Node.ELEMENT_NODE) {
+                    const tagName = node.tagName.toLowerCase();
+                    if (['a', 'strong', 'br', 'p', 'ul', 'li'].includes(tagName)) {
+                        nodesToType.push({ type: 'element', content: node.outerHTML });
+                    } else {
+                        for (let i = 0; i < node.childNodes.length; i++) {
+                            collectNodes(node.childNodes[i]);
+                        }
+                    }
+                }
+            }
+
+            for (let i = 0; i < tempDiv.childNodes.length; i++) {
+                collectNodes(tempDiv.childNodes[i]);
+            }
+
+            const cursor = document.createElement('span');
+            cursor.className = 'cursor';
+            element.appendChild(cursor);
+
+            let currentIndex = 0;
+            let scrollCounter = 0;
+
+            function typeNext() {
+                if (currentIndex < nodesToType.length) {
+                    const nodeSegment = nodesToType[currentIndex];
+                    
+                    if (nodeSegment.type === 'text') {
+                        const textNode = document.createTextNode(nodeSegment.content);
+                        element.insertBefore(textNode, cursor);
+                    } else if (nodeSegment.type === 'element') {
+                        const fragment = document.createRange().createContextualFragment(nodeSegment.content);
+                        element.insertBefore(fragment, cursor);
+                    }
+
+                    currentIndex++;
+                    scrollCounter++;
+
+                    if (scrollCounter % 5 === 0) {
+                        scrollToBottom();
+                    }
+
+                    setTimeout(typeNext, TYPING_SPEED);
+                } else {
+                    cursor.remove();
+                    setProcessingState(false);
+                    scrollToBottom(true);
+                }
+            }
+
+            typeNext();
+        }
+
+        function showTypingIndicator() {
+            if (currentTypingIndicator) {
+                currentTypingIndicator.remove();
+            }
+
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message bot typing-message';
+            messageDiv.innerHTML = `
+                <div class="message-avatar">
+                    <i class="fas fa-robot"></i>
+                </div>
+                <div class="message-content">
+                    <div class="typing-indicator">
+                        <div class="typing-dot"></div>
+                        <div class="typing-dot"></div>
+                        <div class="typing-dot"></div>
+                    </div>
+                </div>
+            `;
+            chatMessages.appendChild(messageDiv);
+            scrollToBottom(true);
+            currentTypingIndicator = messageDiv;
+            return messageDiv;
+        }
+
+        function removeTypingIndicator() {
+            if (currentTypingIndicator) {
+                currentTypingIndicator.remove();
+                currentTypingIndicator = null;
+            }
+        }
+
+        // Chat Functions
+        function openChat() {
+            isChatOpen = true;
+            chatContainer.style.display = 'flex';
+            chatBackdrop.classList.add('show');
+            chatToggle.classList.add('hidden');
+
+            setTimeout(() => {
+                chatContainer.classList.add('show');
+            }, 10);
+
+            messageInput.focus();
+        }
+
+        function closeChat() {
+            isChatOpen = false;
+            chatContainer.classList.remove('show');
+            chatContainer.classList.add('hide');
+            chatBackdrop.classList.remove('show');
+
+            setTimeout(() => {
+                chatContainer.style.display = 'none';
+                chatContainer.classList.remove('hide');
+                chatToggle.classList.remove('hidden');
+            }, 400);
+        }
+
+        function toggleChat() {
+            if (isChatOpen) {
+                closeChat();
+            } else {
+                openChat();
+            }
+        }
+
+        async function sendMessage() {
+            const message = messageInput.value.trim();
+            if (!message || isTyping) return;
+
+            isTyping = true;
+            addUserMessage(message);
+            messageInput.value = '';
+            messageInput.style.height = 'auto';
+
+            messageInput.disabled = true;
+            sendButton.disabled = true;
+            document.querySelectorAll('.quick-action').forEach(button => button.disabled = true);
+            sendButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            statusText.textContent = 'Thinking...';
+
+            const typingIndicator = showTypingIndicator();
+
+            try {
+                const response = await fetch(`${BACKEND_URL}/query`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userQuery: message })
+                });
+
+                if (!response.ok) throw new Error(`Server error: ${response.status}`);
+
+                const data = await response.json();
+                const answer = data.answer || "I couldn't generate a response. Please try again.";
+
+                typingIndicator.remove();
+                addBotMessage(answer);
+            } catch (error) {
+                typingIndicator.remove();
+                addBotMessage(`
+                    <div style="color: #dc2626; padding: 10px; background: #fef2f2; border-radius: 8px; border: 1px solid #fecaca;">
+                        <strong><i class="fas fa-exclamation-triangle"></i> Connection Error</strong><br>
+                        <small>Unable to connect to the server. Please ensure the backend is running.</small>
+                    </div>
+                `, false);
+            } finally {
+                isTyping = false;
+                messageInput.disabled = false;
+                sendButton.disabled = false;
+                document.querySelectorAll('.quick-action').forEach(button => button.disabled = false);
+                sendButton.innerHTML = '<i class="fas fa-paper-plane"></i>';
+                statusText.textContent = 'Online • Ready to help';
+            }
+        }
+
+        // Event Listeners
+        chatToggle.addEventListener('click', toggleChat);
+        closeChatBtn.addEventListener('click', closeChat);
+        chatBackdrop.addEventListener('click', closeChat);
+        sendButton.addEventListener('click', sendMessage);
+
+        messageInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        messageInput.addEventListener('input', () => {
+            messageInput.style.height = 'auto';
+            messageInput.style.height = Math.min(messageInput.scrollHeight, 120) + 'px';
+        });
+
+        // Quick actions event delegation
+        document.addEventListener('click', (e) => {
+            const button = e.target.closest('.quick-action');
+            if (!button || isProcessing) return;
+
+            const query = button.dataset.query;
+            const displayText = button.dataset.display || button.textContent.trim();
+
+            if (query && chatbotData[query]) {
+                addUserMessage(displayText);
+                setProcessingState(true);
+
+                const typingIndicator = showTypingIndicator();
+
+                setTimeout(() => {
+                    removeTypingIndicator();
+                    addBotMessage(chatbotData[query].text, true);
+                }, RESPONSE_DELAY);
+            }
+        });
+
+        // Initialize welcome message
+        function initializeChat() {
+            setTimeout(() => {
+                const welcomeMessage = `
+                    <div class="welcome-message">
+                        <div class="welcome-title">
+                            <div class="welcome-icon">
+                                <i class="fas fa-graduation-cap"></i>
+                            </div>
+                            <h4>Welcome to Ghazali University (GU Tech)!</h4>
+                        </div>
+                        <p class="welcome-text">
+                            I'm your AI assistant for Ghazali University of Engineering & Technology. I can help you with:
+                        </p>
+                        <ul class="feature-list">
+                            <li>Academic programs and courses</li>
+                            <li>Admission requirements and procedures</li>
+                            <li>Fee structures and scholarships</li>
+                            <li>Faculty and department information</li>
+                            <li>Campus facilities and services</li>
+                        </ul>
+                    </div>
+                `;
+                addBotMessage(welcomeMessage, false);
+            }, 500);
+        }
+
+        // Initialize the chat
+        initializeChat();
+    </script>
+</body>
+</html>
