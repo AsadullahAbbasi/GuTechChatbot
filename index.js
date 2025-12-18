@@ -4,13 +4,13 @@ import dotenv from "dotenv";
 import { QdrantClient } from "@qdrant/js-client-rest";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-dotenv.config(); // Load environment variables from .env file
+dotenv.config();
 
 const app = express();
-app.use(cors()); // Enable CORS for all origins (for development)
-app.use(express.json()); // Enable JSON body parsing
+app.use(cors());
+app.use(express.json());
 
-const PORT = process.env.PORT || 3001; // Use port from .env or default to 3001
+const PORT = process.env.PORT || 3001;
 
 // Qdrant Client Setup
 const qdrantClient = new QdrantClient({
@@ -18,124 +18,116 @@ const qdrantClient = new QdrantClient({
   apiKey: process.env.QDRANT_API_KEY,
 });
 
-// Google Gemini Generative AI Client Setup
+// Google Gemini Setup
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const generativeModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-// Google Gemini Embedding Model Setup
-const embeddingModel = genAI.getGenerativeModel({ model: "embedding-001" });
+// USE LATEST ALIASES TO AVOID 404
+const generativeModel = genAI.getGenerativeModel({
+  model: "gemini-2.5-flash", 
+  generationConfig: {
+    temperature: 0.7,
+    maxOutputTokens: 2048,
+  },
+});
 
-// Qdrant Collection Name (must match what you used for embedding)
+const embeddingModel = genAI.getGenerativeModel({ 
+  model: "text-embedding-004" 
+});
+
 const QDRANT_COLLECTION_NAME = "gutech_knowledge_base";
 
-/**
- * Generates an embedding for a given text using the Gemini Embedding API.
- * @param {string} text The text to embed.
- * @returns {Promise<number[]>} A promise that resolves to the embedding vector.
- * @throws {Error} If embedding generation fails.
- */
 async function getEmbedding(text) {
   try {
-    const embeddingRes = await embeddingModel.embedContent(text);
-    if (
-      !embeddingRes ||
-      !embeddingRes.embedding ||
-      !embeddingRes.embedding.values
-    ) {
-      throw new Error("Invalid embedding response from Gemini API.");
+    const result = await embeddingModel.embedContent({
+      content: { parts: [{ text }] },
+      taskType: "RETRIEVAL_QUERY",
+      outputDimensionality: 768, 
+    });
+    
+    if (!result?.embedding?.values) {
+      throw new Error("Invalid embedding response.");
     }
-    return embeddingRes.embedding.values;
+    return result.embedding.values;
   } catch (error) {
-    console.error("Error in getEmbedding:", error);
-    throw new Error(`Failed to generate embedding: ${error.message}`);
+    console.error("Embedding Error:", error.message);
+    throw error;
   }
 }
 
-// API Endpoint for Chat Queries
+function extractUrls(searchResult) {
+  const urls = new Set();
+  searchResult.forEach((item) => {
+    if (item.payload?.url) urls.add(item.payload.url);
+  });
+  return Array.from(urls);
+}
+
+function createStructuredPrompt(context, userQuery, urls) {
+  const urlSection = urls.length > 0 
+    ? `<p><strong>Source Links:</strong><br>${urls.map(url => `<a href="${url}" target="_blank">${url}</a>`).join("<br>")}</p>` 
+    : "";
+
+  return `You are an expert assistant for GU TECH Karachi. Respond ONLY in HTML format.
+Use <h2> for titles, <ul>/<li> for lists, and <p> for paragraphs. No Markdown.
+
+Context Data:
+${context || "No specific data found in the knowledge base. Please provide a general helpful response about GUTech based on your general knowledge."}
+
+User Query: ${userQuery}
+
+${urlSection}`;
+}
+
 app.post("/query", async (req, res) => {
   const { userQuery } = req.body;
-  if (!userQuery) {
-    return res.status(400).json({ error: "User query is required." });
-  }
+
+  if (!userQuery) return res.status(400).json({ error: "Query required" });
 
   try {
-    // 1. Generate embedding for the user's query
+    const startTime = Date.now();
+
+    // 1. Generate search vector
     const queryEmbedding = await getEmbedding(userQuery);
 
-    // 2. Search Qdrant for relevant context
+    // 2. Search Qdrant
     const searchResult = await qdrantClient.search(QDRANT_COLLECTION_NAME, {
       vector: queryEmbedding,
-      limit: 10, // Increased limit for debugging purposes
-      with_payload: true, // Ensure the original content and metadata are returned
+      limit: 5,
+      with_payload: true,
+      // REMOVED score_threshold temporarily to debug "0 chunks" issue
     });
 
-    // Extract content and relevant metadata from relevant chunks to form context
+    console.log(`Matched ${searchResult.length} data chunks.`);
+
+    const relevantUrls = extractUrls(searchResult);
     const context = searchResult
-      .map((item) => {
-        let chunkContent = item.payload?.content || "";
-        const chunkUrl = item.payload?.url;
-        const chunkTitle = item.payload?.title;
-        const chunkSourceFile = item.payload?.source_file;
+      .map(item => item.payload?.content)
+      .filter(Boolean)
+      .join("\n\n---\n\n");
 
-        // Append URL and other useful metadata to the content
-        if (chunkTitle) {
-          chunkContent += `\nTitle: ${chunkTitle}`;
-        }
-        if (chunkUrl) {
-          chunkContent += `\nSource URL: ${chunkUrl}`;
-        }
-        if (chunkSourceFile) {
-          chunkContent += `\nSource File: ${chunkSourceFile}`;
-        }
-        return chunkContent;
-      })
-      .filter(Boolean) // Remove empty strings
-      .join("\n\n---\n\n"); // Join with a clear separator
+    // 3. Generate final HTML answer
+    const prompt = createStructuredPrompt(context, userQuery, relevantUrls);
+    const result = await generativeModel.generateContent(prompt);
+    const answer = result.response.text();
 
-    let chatInput;
-    if (context.trim() === "") {
-      chatInput = `
-      
-      You are a professional, knowledgeable university assistant .
-      you need to respond for GUTech/Al Ghazali University School of Technology under the context of universities and HEIs established in Karachi Pakistan. 
-The user has asked a question, but no specific data is available.
-Your task: respond confidently and helpfully without saying you lack information.
-Provide logical, informed answers based on general university knowledge, best practices, or helpful next steps.
-Example responses:
-- "For up-to-date details on admissions, please visit our official website or contact the admissions office."
-- "You can find information about campus facilities on our website’s About section or reach out to our support team."
-User Query: ${userQuery}`;
-    } else {
-      chatInput = `You are a helpful and expert assistant for GU TECH (Greenwich University Technology Campus).
-Use only the following relevant data to answer the user’s question.
-If the user's query could refer to multiple entities or pieces of information within the provided data, list all relevant options and their key details concisely, rather than asking for clarification.
-Do not state that information is missing or ask the user to refine their query.
-Instead, infer answers based on related info, common university practices, or suggest practical next steps the user can take.
-Keep answers concise, professional, and user-friendly.
-Add emojis only when they add clarity or friendliness.
+    const responseTime = Date.now() - startTime;
 
-Relevant Data:
-${context}
-
-User Query: ${userQuery}`;
-    }
-
-    // 4. Generate response using Gemini-1.5-Flash
-    const result = await generativeModel.generateContent(chatInput);
-    const response = await result.response;
-    const answer = response.text();
-
-    res.json({ answer }); // Send the generated answer back to the frontend
-  } catch (err) {
-    console.error("Error in /query endpoint:", err);
-    res.status(500).json({
-      error:
-        "Failed to fetch answer from AI model or Qdrant. Please check backend logs.",
+    res.json({
+      answer,
+      responseTime: `${responseTime}ms`,
+      relevantUrls,
+      chunksFound: searchResult.length,
     });
+  } catch (err) {
+    console.error("Backend Error Log:", err);
+    res.status(500).json({ error: "Server error occurred. Check backend console." });
   }
 });
 
-// Start the server
+app.get("/health", (req, res) => {
+  res.json({ status: "OK", serverTime: new Date().toISOString() });
+});
+
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`🚀 RAG Chatbot live on port ${PORT}`);
 });
